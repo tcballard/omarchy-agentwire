@@ -98,6 +98,8 @@ test("release pins and workflows are immutable", () => {
   assert.match(revisions, /AGENTWIRE_RUST_TOOLCHAIN=1\.98\.0/)
   assert.equal(fs.existsSync(path.join(root, ".github/workflows/ci.yml")), true)
   assert.equal(fs.existsSync(path.join(root, ".github/workflows/release.yml")), true)
+  assert.match(read(".github/workflows/ci.yml"), /AGENTWIRE_VERIFY_BUNDLE: 1/)
+  assert.match(read(".github/workflows/release.yml"), /AGENTWIRE_VERIFY_BUNDLE: 1/)
   assert.match(read(".gitattributes"), /^\.github export-ignore/m)
   assert.match(read(".gitattributes"), /^launch-pack export-ignore/m)
 })
