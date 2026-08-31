@@ -7,4 +7,3 @@ explicit local-response safeguards.
 
 Audience: AgentWire users running Omarchy 4.0.0, 4.0.1, or a compatible current
 Quattro shell build.
-

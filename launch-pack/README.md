@@ -7,4 +7,3 @@ release archives. Publication remains blocked until the AgentWire contract
 commit lands on `main`, repository protections are confirmed, automated CI is
 green, the Omarchy runtime matrix is complete, and a maintainer approves the
 tag.
-

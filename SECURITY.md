@@ -29,4 +29,3 @@ Review trace files before sharing them.
 
 Please report vulnerabilities privately through GitHub's security advisory
 form for this repository. Do not include real credentials or private traces.
-

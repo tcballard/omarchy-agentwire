@@ -11,4 +11,3 @@
   single-flight polling, timeout, response limit, and bounded backoff.
 - Add pinned cross-repository contract tests, official Omarchy validation,
   Quickshell runtime CI, deterministic release assets, and release runbooks.
-

@@ -8,4 +8,3 @@
 - [ ] Archive and checksum reproduced locally
 - [ ] Annotated or signed `v0.2.0` tag approved
 - [ ] GitHub release assets and notes verified after publication
-
