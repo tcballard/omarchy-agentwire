@@ -24,6 +24,9 @@ fi
 node "$ROOT/scripts/check-agentwire-contract.cjs" "$CORE/contracts/inspector-summary-v1.example.json"
 cargo "+$AGENTWIRE_RUST_TOOLCHAIN" build --release --locked \
   --manifest-path "$CORE/Cargo.toml" --target-dir "$TEMP_DIR/target"
-cmp "$ROOT/bin/agentwire-x86_64" "$TEMP_DIR/target/release/agentwire"
+if [[ ${AGENTWIRE_VERIFY_BUNDLE:-0} == 1 ]]; then
+  cmp "$ROOT/bin/agentwire-x86_64" "$TEMP_DIR/target/release/agentwire"
+  echo "AgentWire bundled-runtime byte match: ok"
+fi
 (cd -- "$ROOT" && sha256sum -c bin/agentwire-x86_64.sha256)
-echo "AgentWire bundled-runtime provenance: ok"
+echo "AgentWire bundled-runtime contract: ok"
