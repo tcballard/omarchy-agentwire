@@ -1,28 +1,12 @@
 # omarchy-agentwire
 
-An [Omarchy](https://omarchy.org) Quattro bar widget for
+An [Omarchy](https://omarchy.org) Quattro service and bar widget for
 [AgentWire](https://github.com/tcballard/AgentWire), the record/diff/replay tap
 for coding-agent protocols. It shows the bounded inspector summary, opens a
 keyboard-friendly detail panel, and jumps to the full browser inspector.
 
 Version 0.2.0 targets Omarchy 4.0.0, 4.0.1, and compatible current Quattro
 shell builds. It consumes AgentWire inspector summary API v1.
-
-## Requirements
-
-Install AgentWire from GitHub; it is not yet available from crates.io and
-does not yet ship prebuilt binaries:
-
-```bash
-cargo install --locked --git https://github.com/tcballard/AgentWire
-```
-
-Start either a live recording or a saved-trace inspector:
-
-```bash
-agentwire record --ui -- codex app-server
-agentwire serve some-trace.jsonl
-```
 
 ## Install
 
@@ -31,6 +15,25 @@ omarchy plugin add https://github.com/tcballard/omarchy-agentwire.git --enable
 ```
 
 Then add **AgentWire** from the bar's *Development* category.
+
+That is the entire setup on x86-64 Omarchy. The plugin includes its pinned
+AgentWire runtime, starts the inspector hub as an enabled Omarchy service, and
+uses private XDG runtime and state directories. There is no Cargo install,
+systemd unit, background command, URL setting, or PATH change.
+
+To record a client session, use the plugin's launcher in place of the agent
+command:
+
+```bash
+~/.config/omarchy/plugins/io.github.tcballard.agentwire/bin/agentwire \
+  record -- codex app-server
+```
+
+The launcher automatically creates a private trace under
+`$XDG_STATE_HOME/agentwire/traces` (or `~/.local/state/agentwire/traces`) and
+publishes it to the already-running inspector. Supplying `--trace` still lets
+you choose a trace path. Starting a recording is an explicit user action;
+installing and operating the Omarchy integration is automatic.
 
 ## States and controls
 
@@ -48,9 +51,9 @@ opens the browser inspector. In the panel, Enter or `O` opens the inspector,
 
 ## Configuration
 
-`inspectorUrl` defaults to `http://127.0.0.1:4777`. Only numeric loopback
-origins (`127.0.0.1` or `[::1]`) are accepted. `pollIntervalMs` defaults to
-2000 and is bounded to 250–60000 ms. Failed polls back off to 30 seconds.
+The native service owns `http://127.0.0.1:4777`; it is intentionally not a
+user setting. `pollIntervalMs` defaults to 2000 and is bounded to 250–60000 ms.
+Failed polls back off to 30 seconds.
 
 The widget requests only `/api/summary`, verifies the final response URL and
 JSON media type for every HTTP response, rejects responses over 64 KiB of
@@ -60,7 +63,9 @@ summary itself is deliberately bounded.
 
 The loopback restriction limits exposure but does not make every local process
 trusted. A malicious loopback service can answer or redirect a request before
-the widget rejects the final URL. See [SECURITY.md](SECURITY.md).
+the widget rejects the final URL. The bundled executable is rebuilt from the
+pinned AgentWire revision and compared byte-for-byte in CI. See
+[SECURITY.md](SECURITY.md).
 
 ## Development and release checks
 

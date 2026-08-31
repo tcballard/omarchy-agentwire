@@ -6,10 +6,9 @@ Security fixes are prepared for the latest released version.
 
 ## Boundary
 
-omarchy-agentwire reads a local AgentWire inspector over unencrypted loopback
-HTTP. Configuration accepts only `127.0.0.1` and `[::1]`; hostnames, remote IPs,
-paths, credentials, and HTTPS origins are rejected. Every nonzero HTTP response
-must finish at the exact configured `/api/summary` URL and declare
+omarchy-agentwire starts its bundled AgentWire inspector on the fixed numeric
+loopback address `127.0.0.1:4777`. The address is not user-configurable. Every
+nonzero HTTP response must finish at the exact `/api/summary` URL and declare
 `application/json` before its body is parsed.
 
 Loopback is a containment boundary, not authentication. Another local process
@@ -24,6 +23,11 @@ backs off after failures.
 
 AgentWire redacts common secrets from traces, but redaction is defense in depth.
 Review trace files before sharing them.
+
+The launcher creates runtime and trace directories with owner-only permissions.
+CI rebuilds the bundled x86-64 executable from the exact public AgentWire
+revision and Rust toolchain in `scripts/contract-revisions.sh`, then requires a
+byte-for-byte match and verifies the committed SHA-256 digest.
 
 ## Reporting
 

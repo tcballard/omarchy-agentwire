@@ -26,7 +26,7 @@ node --test "$ROOT/tests"/*.test.cjs
 "$ROOT/scripts/check-agentwire-contract.sh"
 "$UPSTREAM/bin/omarchy-plugin-validate" "$ROOT"
 node "$ROOT/scripts/check-plain-text.cjs"
-jq -e '.schemaVersion == 1 and .version == "0.2.0" and .entryPoints.barWidget == "Panel.qml"' "$ROOT/manifest.json" >/dev/null
+jq -e '.schemaVersion == 1 and .version == "0.2.0" and .entryPoints.service == "Service.qml" and .entryPoints.barWidget == "Panel.qml"' "$ROOT/manifest.json" >/dev/null
 
 FIRST="$TEMP_DIR/first"; SECOND="$TEMP_DIR/second"
 mkdir -p "$FIRST" "$SECOND"
