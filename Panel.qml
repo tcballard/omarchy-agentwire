@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
@@ -15,9 +16,19 @@ Panel {
   property int failures: 0
   property int requestSerial: 0
   property var activeRequest: null
+  property bool commandCopied: false
+  property bool commandCopyFailed: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
+  readonly property string sourceDir: {
+    if (!bar || !bar.barWidgetRegistry) return ""
+    var metadata = bar.barWidgetRegistry.metadataFor(root.moduleName)
+    return metadata && metadata.sourceDir ? String(metadata.sourceDir) : ""
+  }
+  readonly property string launcherPath: sourceDir === "" ? "" : sourceDir + "/bin/agentwire"
+  readonly property string recordCommand: launcherPath === "" ? ""
+    : Util.shellQuote(launcherPath) + " record -- codex app-server"
   readonly property color statusColor: connectionState === "recording" ? "#78dba9"
     : (connectionState === "completed" || connectionState === "served" ? foreground : dim)
   readonly property string barText: connectionState === "recording" || connectionState === "served" || connectionState === "completed"
@@ -96,6 +107,14 @@ Panel {
     if (root.inspectorUrl !== "") Qt.openUrlExternally(root.inspectorUrl)
   }
 
+  function copyRecordCommand() {
+    if (root.recordCommand === "" || copyProcess.running) return
+    root.commandCopied = false
+    root.commandCopyFailed = false
+    copyProcess.command = ["bash", "-c", "printf %s " + Util.shellQuote(root.recordCommand) + " | wl-copy"]
+    copyProcess.running = true
+  }
+
   onOpenedChanged: if (opened) refresh(true)
   Component.onCompleted: refresh(false)
 
@@ -116,6 +135,27 @@ Panel {
       root.activeRequest.abort()
       root.activeRequest = null
       root.fail("offline")
+    }
+  }
+
+  Timer {
+    id: copiedTimer
+    interval: 2500
+    repeat: false
+    onTriggered: {
+      root.commandCopied = false
+      root.commandCopyFailed = false
+    }
+  }
+
+  Process {
+    id: copyProcess
+    running: false
+    command: []
+    onExited: function(exitCode) {
+      root.commandCopied = exitCode === 0
+      root.commandCopyFailed = exitCode !== 0
+      copiedTimer.restart()
     }
   }
 
@@ -152,6 +192,7 @@ Panel {
       onTextKey: function(text) {
         if (text === "r" || text === "R") root.refresh(true)
         else if (text === "o" || text === "O") root.openInspector()
+        else if (text === "c" || text === "C") root.copyRecordCommand()
       }
 
       ColumnLayout {
@@ -199,9 +240,44 @@ Panel {
           elide: Text.ElideRight
           Layout.fillWidth: true
         }
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(8)
+
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: Style.space(1)
+
+            Text {
+              textFormat: Text.PlainText
+              text: "Codex App Server wrapper"
+              color: root.foreground
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              font.pixelSize: Style.font.body
+            }
+            Text {
+              textFormat: Text.PlainText
+              text: root.commandCopied ? "Command copied"
+                : (root.commandCopyFailed ? "Could not copy command" : "Copy the command; recording still starts explicitly")
+              color: root.commandCopied ? root.statusColor : root.dim
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+          }
+
+          PanelActionButton {
+            iconText: root.commandCopied ? "󰄬" : "󰆏"
+            tooltipText: root.commandCopied ? "Command copied" : "Copy recording command"
+            foreground: root.foreground
+            fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            enabled: root.recordCommand !== "" && !copyProcess.running
+            Layout.alignment: Qt.AlignVCenter
+            onClicked: root.copyRecordCommand()
+          }
+        }
         Text {
           textFormat: Text.PlainText
-          text: "Enter/O: inspector   R: refresh   Esc: close"
+          text: "Enter/O: inspector   C: copy command   R: refresh   Esc: close"
           color: root.dim
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.caption
