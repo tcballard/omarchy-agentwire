@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "trace_version": 1,
+  "mode": "served_trace",
+  "active": false,
+  "session_id": "saved-1",
+  "started_at": "2026-08-30T21:40:45.786Z",
+  "ended": false,
+  "exit_code": null,
+  "events": 4,
+  "duration_ms": 500,
+  "client_messages": 2,
+  "server_messages": 2,
+  "invalid_messages": 0,
+  "errors": 0,
+  "last_method": "initialize"
+}
