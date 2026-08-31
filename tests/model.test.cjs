@@ -84,3 +84,12 @@ test("formats durations and status without markup", () => {
   assert.equal(Model.durationLabel(1240), "1.2 s")
   assert.equal(Model.statusLabel("completed", { exitCode: 3 }), "Completed · exit 3")
 })
+
+test("provides explicit Codex, ACP, and MCP recording recipes", () => {
+  assert.deepEqual({ ...Model.recordingRecipe("codex") }, {
+    key: "codex", label: "Codex App Server", target: "codex app-server", shortcut: "C"
+  })
+  assert.equal(Model.recordingRecipe("acp").target, "YOUR_ACP_AGENT")
+  assert.equal(Model.recordingRecipe("mcp").target, "YOUR_MCP_SERVER")
+  assert.equal(Model.recordingRecipe("unknown"), null)
+})

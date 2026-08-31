@@ -91,15 +91,23 @@ test("poller carries the response and lifecycle guards", () => {
     assert.ok(read("Model.js").includes(`\"${state}\"`) || panel.includes(`\"${state}\"`))
 })
 
-test("panel copies an explicit recording command without launching it", () => {
+test("panel copies explicit recording recipes without launching them", () => {
   const panel = read("Panel.qml")
   assert.match(panel, /barWidgetRegistry\.metadataFor\(root\.moduleName\)/)
   assert.match(panel, /sourceDir \+ "\/bin\/agentwire"/)
-  assert.match(panel, /record -- codex app-server/)
+  assert.match(panel, /" record -- " \+ recipe\.target/)
   assert.match(panel, /wl-copy/)
-  assert.match(panel, /text === "c" \|\| text === "C"/)
-  assert.match(panel, /commandCopied = exitCode === 0/)
+  for (const recipe of ["codex", "acp", "mcp"])
+    assert.match(panel, new RegExp(`copyRecordCommand\\("${recipe}"\\)`))
   assert.doesNotMatch(panel, /execDetached\(\[root\.launcherPath,\s*"record"/)
+})
+
+test("panel opens the private XDG trace folder explicitly", () => {
+  const panel = read("Panel.qml")
+  assert.match(panel, /XDG_STATE_HOME/)
+  assert.match(panel, /\.local\/state\/agentwire\/traces/)
+  assert.match(panel, /traceProcess\.command = \["xdg-open", root\.tracesDir\]/)
+  assert.match(panel, /text === "t" \|\| text === "T"/)
 })
 
 test("release pins and workflows are immutable", () => {

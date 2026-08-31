@@ -47,9 +47,15 @@ installing and operating the Omarchy integration is automatic.
 
 Left-click opens the panel, middle-click refreshes immediately, and right-click
 opens the browser inspector. In the panel, Enter or `O` opens the inspector,
-`C` copies the installed launcher command for wrapping `codex app-server`, `R`
-refreshes, Tab switches panels, and Escape closes it. Copying the command does
-not start a recording or modify Codex configuration.
+`C` copies the ready-to-use `codex app-server` wrapper, `A` copies an ACP agent
+template, `M` copies an MCP server template, `T` opens the private trace folder,
+`R` refreshes, Tab switches panels, and Escape closes it. Replace
+`YOUR_ACP_AGENT` or `YOUR_MCP_SERVER` in a template with the command selected by
+your client. Copying a command does not start a recording or modify client
+configuration.
+
+Saved traces open from `$XDG_STATE_HOME/agentwire/traces` or the fallback
+`~/.local/state/agentwire/traces`.
 
 ## Configuration
 
