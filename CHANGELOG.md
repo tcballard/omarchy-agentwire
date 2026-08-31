@@ -7,6 +7,9 @@
   automatically when the plugin is enabled.
 - Add an XDG-native launcher that creates private traces and publishes live
   state without Cargo, systemd, URL, or PATH setup.
+- Add a native panel action and keyboard shortcut for copying the installed
+  Codex App Server wrapper command without starting a recording or changing
+  client configuration.
 - Consume AgentWire's bounded inspector summary API v1 instead of downloading
   and reducing the full event stream.
 - Distinguish recording, served, completed, limited, unavailable,

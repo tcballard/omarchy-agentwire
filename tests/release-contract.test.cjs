@@ -91,6 +91,17 @@ test("poller carries the response and lifecycle guards", () => {
     assert.ok(read("Model.js").includes(`\"${state}\"`) || panel.includes(`\"${state}\"`))
 })
 
+test("panel copies an explicit recording command without launching it", () => {
+  const panel = read("Panel.qml")
+  assert.match(panel, /barWidgetRegistry\.metadataFor\(root\.moduleName\)/)
+  assert.match(panel, /sourceDir \+ "\/bin\/agentwire"/)
+  assert.match(panel, /record -- codex app-server/)
+  assert.match(panel, /wl-copy/)
+  assert.match(panel, /text === "c" \|\| text === "C"/)
+  assert.match(panel, /commandCopied = exitCode === 0/)
+  assert.doesNotMatch(panel, /execDetached\(\[root\.launcherPath,\s*"record"/)
+})
+
 test("release pins and workflows are immutable", () => {
   const revisions = read("scripts/contract-revisions.sh")
   assert.match(revisions, /OMARCHY_REVISION=[0-9a-f]{40}/)

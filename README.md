@@ -47,7 +47,9 @@ installing and operating the Omarchy integration is automatic.
 
 Left-click opens the panel, middle-click refreshes immediately, and right-click
 opens the browser inspector. In the panel, Enter or `O` opens the inspector,
-`R` refreshes, Tab switches panels, and Escape closes it.
+`C` copies the installed launcher command for wrapping `codex app-server`, `R`
+refreshes, Tab switches panels, and Escape closes it. Copying the command does
+not start a recording or modify Codex configuration.
 
 ## Configuration
 
