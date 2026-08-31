@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Release contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y jq
+      - run: scripts/check-release.sh
+
+  qml-runtime:
+    name: Quickshell runtime contract
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - run: pacman -Syu --noconfirm git jq nodejs quickshell weston dbus
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          export XDG_RUNTIME_DIR="$(mktemp -d)"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          weston --backend=headless-backend.so --socket=wayland-9 --idle-time=0 >weston.log 2>&1 &
+          export WAYLAND_DISPLAY=wayland-9
+          for _ in {1..50}; do [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break; sleep 0.1; done
+          scripts/check-qml-runtime.sh
+
+  build-assets:
+    name: Build deterministic assets
+    needs: [verify, qml-runtime]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get update && sudo apt-get install -y jq
+      - shell: bash
+        run: |
+          scripts/build-release.sh dist-a "$GITHUB_SHA"
+          scripts/build-release.sh dist-b "$GITHUB_SHA"
+          cmp dist-a/*.tar.gz dist-b/*.tar.gz
+          mkdir extracted
+          tar -xzf dist-a/*.tar.gz -C extracted
+          test -f extracted/io.github.tcballard.agentwire/manifest.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-assets
+          path: dist-a/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: build-assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets
+          path: dist
+      - name: Verify provenance and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c *.sha256
+          cd ..
+          scripts/build-release.sh rebuilt "$GITHUB_SHA"
+          cmp dist/*.tar.gz rebuilt/*.tar.gz
+          TAG=${GITHUB_REF_NAME}
+          REMOTE_PEELED=$(git ls-remote origin "refs/tags/$TAG^{}" | awk '{print $1}')
+          test "$REMOTE_PEELED" = "$GITHUB_SHA"
+          NOTES="docs/releases/${TAG}.md"
+          test -f "$NOTES"
+          gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes-file "$NOTES" dist/*
+          gh release edit "$TAG" --draft=false

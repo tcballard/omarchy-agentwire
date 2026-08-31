@@ -2,16 +2,37 @@
   "schemaVersion": 1,
   "id": "io.github.tcballard.agentwire",
   "name": "AgentWire",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Tom Ballard",
   "license": "MIT",
   "description": "Live status for AgentWire coding-agent recordings: session state and event counts in the bar, details and a jump to the inspector in a panel.",
   "kinds": ["bar-widget"],
-  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "entryPoints": { "barWidget": "Panel.qml" },
   "barWidget": {
     "displayName": "AgentWire",
     "category": "Development",
     "allowMultiple": false,
-    "defaultSection": "right"
+    "defaultSection": "right",
+    "defaults": {
+      "inspectorUrl": "http://127.0.0.1:4777",
+      "pollIntervalMs": 2000
+    },
+    "schema": [
+      {
+        "key": "inspectorUrl",
+        "type": "string",
+        "label": "Inspector loopback URL",
+        "defaultValue": "http://127.0.0.1:4777"
+      },
+      {
+        "key": "pollIntervalMs",
+        "type": "integer",
+        "label": "Poll interval (ms)",
+        "min": 250,
+        "max": 60000,
+        "step": 250,
+        "defaultValue": 2000
+      }
+    ]
   }
 }

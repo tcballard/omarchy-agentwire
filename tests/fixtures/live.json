@@ -1,0 +1,17 @@
+{
+  "api_version": 1,
+  "trace_version": 1,
+  "mode": "live_record",
+  "active": true,
+  "session_id": "live-1",
+  "started_at": "2026-08-30T21:40:45.786Z",
+  "ended": false,
+  "exit_code": null,
+  "events": 11,
+  "duration_ms": 12.4,
+  "client_messages": 4,
+  "server_messages": 7,
+  "invalid_messages": 0,
+  "errors": 0,
+  "last_method": "turn/completed"
+}

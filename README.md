@@ -1,26 +1,28 @@
 # omarchy-agentwire
 
-An [Omarchy](https://omarchy.org) bar widget for
-[AgentWire](https://github.com/tcballard/AgentWire), the record/diff/replay
-tap for coding-agent protocols (Codex App Server, ACP).
+An [Omarchy](https://omarchy.org) Quattro bar widget for
+[AgentWire](https://github.com/tcballard/AgentWire), the record/diff/replay tap
+for coding-agent protocols. It shows the bounded inspector summary, opens a
+keyboard-friendly detail panel, and jumps to the full browser inspector.
 
-The widget polls the local AgentWire inspector and shows a live indicator
-with the protocol event count while a recording session is running. Clicking
-it opens a panel with the session summary — client/server message counts,
-errors, the last method seen — and a link that opens the full browser
-inspector.
-
-Everything stays on your machine: the widget only reads the inspector's
-loopback endpoint (`http://127.0.0.1:4777/api/events`) and makes no other
-network requests.
+Version 0.2.0 targets Omarchy 4.0.0, 4.0.1, and compatible current Quattro
+shell builds. It consumes AgentWire inspector summary API v1.
 
 ## Requirements
 
-- The `agentwire` CLI: `cargo install --locked agentwire`, or a binary from
-  the [AgentWire releases](https://github.com/tcballard/AgentWire/releases).
-- A running inspector: either a live recording session
-  (`agentwire record --ui -- codex app-server`) or a served trace
-  (`agentwire serve some-trace.jsonl`).
+Install AgentWire from GitHub; it is not yet available from crates.io and
+does not yet ship prebuilt binaries:
+
+```bash
+cargo install --locked --git https://github.com/tcballard/AgentWire
+```
+
+Start either a live recording or a saved-trace inspector:
+
+```bash
+agentwire record --ui -- codex app-server
+agentwire serve some-trace.jsonl
+```
 
 ## Install
 
@@ -28,51 +30,51 @@ network requests.
 omarchy plugin add https://github.com/tcballard/omarchy-agentwire.git --enable
 ```
 
-Then add the **AgentWire** widget (category *Development*) to your bar.
+Then add **AgentWire** from the bar's *Development* category.
 
-## Usage
+## States and controls
 
-- **Idle** (dim dot, `AW`): no inspector is listening on the configured
-  address. Start a recording with `--ui` and the widget lights up on its own.
-- **Recording** (green dot, `AW <n>`): a session is live; `n` is the protocol
-  event count.
-- **Finished** (grey dot with a count): the trace is still being served but
-  the recorded session has ended.
-- **Panel**: event totals per direction, error count, last method, and
-  *Open inspector ↗* to jump to the full web inspector. Escape closes it.
+- `Recording` means the inspector owns a live trace that has not ended.
+- `Served trace` means a saved, incomplete trace is being viewed; it is not a
+  claim that a recording process is active.
+- `Completed` includes the signed exit status when AgentWire captured one.
+- `Connecting`, `offline`, `unavailable`, `incompatible`, `limited`, and
+  `misconfigured` are distinct so transport, contract, and configuration
+  failures are not mistaken for an idle session.
+
+Left-click opens the panel, middle-click refreshes immediately, and right-click
+opens the browser inspector. In the panel, Enter or `O` opens the inspector,
+`R` refreshes, Tab switches panels, and Escape closes it.
 
 ## Configuration
 
-Two properties at the top of `BarWidget.qml`:
+`inspectorUrl` defaults to `http://127.0.0.1:4777`. Only numeric loopback
+origins (`127.0.0.1` or `[::1]`) are accepted. `pollIntervalMs` defaults to
+2000 and is bounded to 250–60000 ms. Failed polls back off to 30 seconds.
 
-- `inspectorUrl` (default `http://127.0.0.1:4777`) — match the `--ui` or
-  `serve` address if you changed it.
-- `pollIntervalMs` (default `2000`).
+The widget requests only `/api/summary`, verifies the final response URL and
+JSON media type for every HTTP response, rejects responses over 64 KiB of
+characters, and uses a five-second timeout. XMLHttpRequest implementations may
+buffer some or all of a response before the size check can abort it; AgentWire's
+summary itself is deliberately bounded.
 
-## Development
+The loopback restriction limits exposure but does not make every local process
+trusted. A malicious loopback service can answer or redirect a request before
+the widget rejects the final URL. See [SECURITY.md](SECURITY.md).
 
-The polling and summary logic lives in `Model.js` and is exercised against
-the real inspector API in AgentWire's repository. Validate the plugin
-lifecycle on an Omarchy machine:
-
-```bash
-omarchy plugin validate "$HOME/.config/omarchy/plugins/io.github.tcballard.agentwire"
-qmllint -I "$OMARCHY_PATH/shell" BarWidget.qml Panel.qml
-```
-
-The QML follows the documented plugin conventions (shared `moduleName`, the
-panel loaded from the bar entry point, `opened`/`open()`/`close()`
-forwarding, `PanelKeyCatcher` for Escape). If the shell's base-class API
-differs from a freshly cloned built-in (`omarchy plugin clone omarchy.clock
---edit`), align with the clone.
-
-## Removal
-
-Disable the widget in the bar settings, then remove the plugin directory:
+## Development and release checks
 
 ```bash
-rm -rf "$HOME/.config/omarchy/plugins/io.github.tcballard.agentwire"
+node --test tests/*.test.cjs
+scripts/check-agentwire-contract.sh
+scripts/check-release.sh
+scripts/check-qml-runtime.sh
 ```
+
+The last command requires Quickshell and a Wayland compositor. CI runs the
+official pinned Omarchy bar-widget fixture under headless Weston. See
+[docs/RELEASING.md](docs/RELEASING.md) for the coordinated release order and
+manual runtime matrix.
 
 ## License
 
