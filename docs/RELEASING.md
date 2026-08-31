@@ -2,11 +2,12 @@
 
 ## Coordinated order
 
-1. Land the AgentWire inspector-summary PR on `main` and record its exact
+1. Land the AgentWire publishable-hub PR on `main` and record its exact
    public commit SHA. If squash or rebase changes it, update
    `scripts/contract-revisions.sh`, rerun every gate, and update the plugin PR.
-2. Confirm the plugin's `AGENTWIRE_REVISION` fetches publicly and the canonical
-   contract check passes.
+2. Confirm the plugin's `AGENTWIRE_REVISION` fetches publicly, the canonical
+   contract check passes, and the bundled runtime rebuilds byte-for-byte with
+   `AGENTWIRE_RUST_TOOLCHAIN`.
 3. Require green `Release contract` and `Quickshell runtime contract` checks on
    the plugin PR, then complete the hands-on matrix below.
 4. Merge the plugin PR to protected `main`.
@@ -34,15 +35,16 @@ The automated Quickshell fixture catches entry-point and shell-contract errors,
 but it does not replace visual and interaction checks on real Omarchy systems.
 Record evidence for:
 
-| Target | Horizontal bar | Vertical bar | Keyboard | Live → complete | Served trace | Offline/recovery |
-|---|---:|---:|---:|---:|---:|---:|
-| Omarchy 4.0.0 | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Omarchy 4.0.1 | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Current compatible Quattro | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Target | Install/enable | Shell restart | Horizontal | Vertical | Keyboard | Live → complete | Hub recovery |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Omarchy 4.0.0 | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Omarchy 4.0.1 | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Current compatible Quattro | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 Also verify right-click opens the inspector, middle-click refreshes, a malformed
-URL shows `misconfigured`, API-version drift shows `incompatible`, and dynamic
-methods containing markup characters render literally.
+snapshot shows `unavailable`, API-version drift shows `incompatible`, no
+inspector URL setting exists, and dynamic methods containing markup characters
+render literally.
 
 ## Commands
 

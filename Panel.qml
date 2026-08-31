@@ -8,8 +8,7 @@ Panel {
   id: root
   moduleName: "io.github.tcballard.agentwire"
 
-  readonly property string configuredUrl: String(setting("inspectorUrl", "http://127.0.0.1:4777"))
-  readonly property string inspectorUrl: Model.normalizeInspectorUrl(configuredUrl)
+  readonly property string inspectorUrl: "http://127.0.0.1:4777"
   readonly property int pollIntervalMs: Math.max(250, Math.min(60000, Number(setting("pollIntervalMs", 2000))))
   property string connectionState: "connecting"
   property var summary: Model.emptySummary()
@@ -97,7 +96,6 @@ Panel {
     if (root.inspectorUrl !== "") Qt.openUrlExternally(root.inspectorUrl)
   }
 
-  onConfiguredUrlChanged: refresh(true)
   onOpenedChanged: if (opened) refresh(true)
   Component.onCompleted: refresh(false)
 

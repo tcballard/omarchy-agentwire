@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+case $(uname -m) in
+  x86_64) BINARY="$ROOT/bin/agentwire-x86_64" ;;
+  *) echo "AgentWire does not support this Omarchy architecture yet" >&2; exit 69 ;;
+esac
+[[ -x $BINARY ]] || { echo "AgentWire runtime is missing from this plugin" >&2; exit 69; }
+
+RUNTIME_ROOT=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}/agentwire
+STATE_ROOT=${XDG_STATE_HOME:-${HOME:?HOME is required}/.local/state}/agentwire
+mkdir -p -- "$RUNTIME_ROOT" "$STATE_ROOT/traces"
+chmod 700 -- "$RUNTIME_ROOT" "$STATE_ROOT" "$STATE_ROOT/traces"
+SNAPSHOT="$RUNTIME_ROOT/inspector.json"
+
+command_name=${1:-}
+case $command_name in
+  hub)
+    shift
+    exec "$BINARY" hub --state "$SNAPSHOT" "$@"
+    ;;
+  record)
+    shift
+    has_trace=false
+    for argument in "$@"; do
+      [[ $argument == -- ]] && break
+      [[ $argument == --trace || $argument == --trace=* ]] && has_trace=true
+      if [[ $argument == --ui || $argument == --publish-summary || $argument == --publish-summary=* ]]; then
+        echo "The Omarchy plugin owns AgentWire's inspector hub; $argument is not available through its launcher" >&2
+        exit 64
+      fi
+    done
+
+    record_arguments=(--publish-summary "$SNAPSHOT")
+    if [[ $has_trace == false ]]; then
+      trace="$STATE_ROOT/traces/agentwire-$(date -u +%Y%m%dT%H%M%SZ)-$$.jsonl"
+      record_arguments+=(--trace "$trace")
+    fi
+    exec "$BINARY" record "${record_arguments[@]}" "$@"
+    ;;
+  *)
+    exec "$BINARY" "$@"
+    ;;
+esac
