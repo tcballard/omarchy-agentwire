@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -16,8 +17,10 @@ Panel {
   property int failures: 0
   property int requestSerial: 0
   property var activeRequest: null
-  property bool commandCopied: false
-  property bool commandCopyFailed: false
+  property string pendingRecipe: ""
+  property string copiedRecipe: ""
+  property string failedRecipe: ""
+  property string traceOpenState: "idle"
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
@@ -27,8 +30,11 @@ Panel {
     return metadata && metadata.sourceDir ? String(metadata.sourceDir) : ""
   }
   readonly property string launcherPath: sourceDir === "" ? "" : sourceDir + "/bin/agentwire"
-  readonly property string recordCommand: launcherPath === "" ? ""
-    : Util.shellQuote(launcherPath) + " record -- codex app-server"
+  readonly property var recipeKeys: ["codex", "acp", "mcp"]
+  readonly property string homeDir: String(Quickshell.env("HOME") || "")
+  readonly property string stateHome: String(Quickshell.env("XDG_STATE_HOME") || "")
+  readonly property string tracesDir: stateHome !== "" ? stateHome + "/agentwire/traces"
+    : (homeDir === "" ? "" : homeDir + "/.local/state/agentwire/traces")
   readonly property color statusColor: connectionState === "recording" ? "#78dba9"
     : (connectionState === "completed" || connectionState === "served" ? foreground : dim)
   readonly property string barText: connectionState === "recording" || connectionState === "served" || connectionState === "completed"
@@ -107,12 +113,32 @@ Panel {
     if (root.inspectorUrl !== "") Qt.openUrlExternally(root.inspectorUrl)
   }
 
-  function copyRecordCommand() {
-    if (root.recordCommand === "" || copyProcess.running) return
-    root.commandCopied = false
-    root.commandCopyFailed = false
-    copyProcess.command = ["bash", "-c", "printf %s " + Util.shellQuote(root.recordCommand) + " | wl-copy"]
+  function recordCommand(recipeKey) {
+    var recipe = Model.recordingRecipe(recipeKey)
+    if (root.launcherPath === "" || !recipe) return ""
+    return Util.shellQuote(root.launcherPath) + " record -- " + recipe.target
+  }
+
+  function recipeLabel(recipeKey) {
+    var recipe = Model.recordingRecipe(recipeKey)
+    return recipe ? recipe.label : ""
+  }
+
+  function copyRecordCommand(recipeKey) {
+    var command = root.recordCommand(recipeKey)
+    if (command === "" || copyProcess.running) return
+    root.pendingRecipe = recipeKey
+    root.copiedRecipe = ""
+    root.failedRecipe = ""
+    copyProcess.command = ["bash", "-c", "printf %s " + Util.shellQuote(command) + " | wl-copy"]
     copyProcess.running = true
+  }
+
+  function openTraceFolder() {
+    if (root.tracesDir === "" || traceProcess.running) return
+    root.traceOpenState = "opening"
+    traceProcess.command = ["xdg-open", root.tracesDir]
+    traceProcess.running = true
   }
 
   onOpenedChanged: if (opened) refresh(true)
@@ -139,12 +165,13 @@ Panel {
   }
 
   Timer {
-    id: copiedTimer
+    id: actionFeedbackTimer
     interval: 2500
     repeat: false
     onTriggered: {
-      root.commandCopied = false
-      root.commandCopyFailed = false
+      root.copiedRecipe = ""
+      root.failedRecipe = ""
+      root.traceOpenState = "idle"
     }
   }
 
@@ -153,9 +180,20 @@ Panel {
     running: false
     command: []
     onExited: function(exitCode) {
-      root.commandCopied = exitCode === 0
-      root.commandCopyFailed = exitCode !== 0
-      copiedTimer.restart()
+      root.copiedRecipe = exitCode === 0 ? root.pendingRecipe : ""
+      root.failedRecipe = exitCode === 0 ? "" : root.pendingRecipe
+      root.pendingRecipe = ""
+      actionFeedbackTimer.restart()
+    }
+  }
+
+  Process {
+    id: traceProcess
+    running: false
+    command: []
+    onExited: function(exitCode) {
+      root.traceOpenState = exitCode === 0 ? "opened" : "failed"
+      actionFeedbackTimer.restart()
     }
   }
 
@@ -192,7 +230,10 @@ Panel {
       onTextKey: function(text) {
         if (text === "r" || text === "R") root.refresh(true)
         else if (text === "o" || text === "O") root.openInspector()
-        else if (text === "c" || text === "C") root.copyRecordCommand()
+        else if (text === "c" || text === "C") root.copyRecordCommand("codex")
+        else if (text === "a" || text === "A") root.copyRecordCommand("acp")
+        else if (text === "m" || text === "M") root.copyRecordCommand("mcp")
+        else if (text === "t" || text === "T") root.openTraceFolder()
       }
 
       ColumnLayout {
@@ -240,6 +281,68 @@ Panel {
           elide: Text.ElideRight
           Layout.fillWidth: true
         }
+        Text {
+          textFormat: Text.PlainText
+          text: "Recording commands"
+          color: root.foreground
+          font.family: root.bar ? root.bar.fontFamily : Style.font.family
+          font.pixelSize: Style.font.body
+          font.bold: true
+        }
+        Repeater {
+          model: root.recipeKeys
+
+          delegate: RowLayout {
+            id: recipeRow
+            required property string modelData
+            readonly property var recipe: Model.recordingRecipe(modelData)
+
+            Layout.fillWidth: true
+            spacing: Style.space(8)
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: Style.space(1)
+
+              Text {
+                textFormat: Text.PlainText
+                text: recipeRow.recipe.label
+                color: root.foreground
+                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.pixelSize: Style.font.body
+              }
+              Text {
+                textFormat: Text.PlainText
+                text: recipeRow.recipe.key === "codex"
+                  ? recipeRow.recipe.shortcut + ": copy ready-to-use command"
+                  : recipeRow.recipe.shortcut + ": copy placeholder command"
+                color: root.dim
+                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            PanelActionButton {
+              iconText: root.copiedRecipe === recipeRow.recipe.key ? "󰄬" : "󰆏"
+              tooltipText: root.copiedRecipe === recipeRow.recipe.key ? "Command copied" : "Copy recording command"
+              foreground: root.foreground
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+              enabled: root.recordCommand(recipeRow.recipe.key) !== "" && !copyProcess.running
+              Layout.alignment: Qt.AlignVCenter
+              onClicked: root.copyRecordCommand(recipeRow.recipe.key)
+            }
+          }
+        }
+        Text {
+          textFormat: Text.PlainText
+          visible: root.copiedRecipe !== "" || root.failedRecipe !== ""
+          text: root.copiedRecipe !== ""
+            ? root.recipeLabel(root.copiedRecipe) + " command copied"
+            : (root.failedRecipe !== "" ? "Could not copy " + root.recipeLabel(root.failedRecipe).toLowerCase() : "")
+          color: root.copiedRecipe !== "" ? root.statusColor : root.dim
+          font.family: root.bar ? root.bar.fontFamily : Style.font.family
+          font.pixelSize: Style.font.caption
+        }
         RowLayout {
           Layout.fillWidth: true
           spacing: Style.space(8)
@@ -250,34 +353,34 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              text: "Codex App Server wrapper"
+              text: "Saved traces"
               color: root.foreground
               font.family: root.bar ? root.bar.fontFamily : Style.font.family
               font.pixelSize: Style.font.body
             }
             Text {
               textFormat: Text.PlainText
-              text: root.commandCopied ? "Command copied"
-                : (root.commandCopyFailed ? "Could not copy command" : "Copy the command; recording still starts explicitly")
-              color: root.commandCopied ? root.statusColor : root.dim
+              text: root.traceOpenState === "opened" ? "Trace folder opened"
+                : (root.traceOpenState === "failed" ? "Could not open trace folder" : "Open the private XDG trace folder")
+              color: root.traceOpenState === "opened" ? root.statusColor : root.dim
               font.family: root.bar ? root.bar.fontFamily : Style.font.family
               font.pixelSize: Style.font.caption
             }
           }
 
           PanelActionButton {
-            iconText: root.commandCopied ? "󰄬" : "󰆏"
-            tooltipText: root.commandCopied ? "Command copied" : "Copy recording command"
+            iconText: root.traceOpenState === "opened" ? "󰄬" : "󰉋"
+            tooltipText: root.traceOpenState === "opened" ? "Trace folder opened" : "Open saved traces"
             foreground: root.foreground
             fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-            enabled: root.recordCommand !== "" && !copyProcess.running
+            enabled: root.tracesDir !== "" && !traceProcess.running
             Layout.alignment: Qt.AlignVCenter
-            onClicked: root.copyRecordCommand()
+            onClicked: root.openTraceFolder()
           }
         }
         Text {
           textFormat: Text.PlainText
-          text: "Enter/O: inspector   C: copy command   R: refresh   Esc: close"
+          text: "O: inspector   C/A/M: copy   T: traces   R: refresh   Esc: close"
           color: root.dim
           font.family: root.bar ? root.bar.fontFamily : Style.font.family
           font.pixelSize: Style.font.caption

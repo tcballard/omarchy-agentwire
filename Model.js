@@ -99,3 +99,13 @@ function statusLabel(state, summary) {
   if (state === "unavailable") return "Trace unavailable"
   return "Connecting"
 }
+
+function recordingRecipe(key) {
+  if (key === "codex")
+    return { key: "codex", label: "Codex App Server", target: "codex app-server", shortcut: "C" }
+  if (key === "acp")
+    return { key: "acp", label: "ACP agent template", target: "YOUR_ACP_AGENT", shortcut: "A" }
+  if (key === "mcp")
+    return { key: "mcp", label: "MCP server template", target: "YOUR_MCP_SERVER", shortcut: "M" }
+  return null
+}

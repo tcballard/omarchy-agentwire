@@ -10,6 +10,8 @@
 - Add a native panel action and keyboard shortcut for copying the installed
   Codex App Server wrapper command without starting a recording or changing
   client configuration.
+- Expand native recording actions with explicit ACP and MCP command templates,
+  plus direct access to the private XDG trace folder.
 - Consume AgentWire's bounded inspector summary API v1 instead of downloading
   and reducing the full event stream.
 - Distinguish recording, served, completed, limited, unavailable,
