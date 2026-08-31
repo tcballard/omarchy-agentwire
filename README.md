@@ -35,6 +35,17 @@ publishes it to the already-running inspector. Supplying `--trace` still lets
 you choose a trace path. Starting a recording is an explicit user action;
 installing and operating the Omarchy integration is automatic.
 
+## Remove
+
+```bash
+omarchy plugin remove io.github.tcballard.agentwire
+```
+
+Omarchy disables and unloads the plugin before removing its checkout. Saved
+traces remain in `$XDG_STATE_HOME/agentwire/traces` or
+`~/.local/state/agentwire/traces` so removal does not destroy recordings; delete
+that directory separately only when those traces are no longer needed.
+
 ## States and controls
 
 - `Recording` means the inspector owns a live trace that has not ended.
@@ -56,6 +67,21 @@ configuration.
 
 Saved traces open from `$XDG_STATE_HOME/agentwire/traces` or the fallback
 `~/.local/state/agentwire/traces`.
+
+## Runtime requirements and permissions
+
+- Requires x86-64 Omarchy with a compatible Quattro shell. The bundled
+  AgentWire executable does not currently support ARM systems.
+- Uses Omarchy's existing `bash`, `wl-copy`, and `xdg-open` commands for the
+  explicit copy-command and open-trace-folder actions. It does not add system
+  packages or change system configuration.
+- Runs as unsandboxed user code. When enabled, it starts the bundled AgentWire
+  child process, binds `127.0.0.1:4777`, and writes owner-only runtime state and
+  traces below the user's XDG directories.
+- Network activity is limited to the loopback inspector. Opening the inspector,
+  writing a command to the clipboard, and opening the trace folder happen only
+  after the corresponding user action.
+- Requires no `sudo`, `pkexec`, systemd unit, credentials, or external service.
 
 ## Configuration
 
