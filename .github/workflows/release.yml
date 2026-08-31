@@ -38,6 +38,7 @@ jobs:
         run: |
           export XDG_RUNTIME_DIR="$(mktemp -d)"
           chmod 700 "$XDG_RUNTIME_DIR"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           weston --backend=headless-backend.so --socket=wayland-9 --idle-time=0 >weston.log 2>&1 &
           export WAYLAND_DISPLAY=wayland-9
           for _ in {1..50}; do [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break; sleep 0.1; done
