@@ -7,4 +7,3 @@ attach:
 - `omarchy-agentwire-v0.2.0.tar.gz.sha256`
 
 Do not manually replace workflow-produced assets.
-

@@ -15,4 +15,3 @@ for (const start of starts) {
   }
 }
 console.log(`dynamic text safety: ${starts.length} Text blocks use Text.PlainText`)
-

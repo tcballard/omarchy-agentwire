@@ -30,4 +30,3 @@ XDG_ROOT=$(mktemp -d)
 trap 'rm -rf -- "$XDG_ROOT"; cleanup' EXIT
 XDG_CONFIG_HOME="$XDG_ROOT/config" XDG_CACHE_HOME="$XDG_ROOT/cache" XDG_STATE_HOME="$XDG_ROOT/state" \
   "$UPSTREAM/test/shell.d/bar-widget-contract-test.sh"
-

@@ -16,4 +16,3 @@ assert.equal(parsed.state, "recording")
 assert.equal(parsed.summary.events, golden.events)
 assert.equal(parsed.summary.lastMethod, golden.last_method)
 console.log("AgentWire inspector-summary-v1 contract: ok")
-

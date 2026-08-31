@@ -40,4 +40,3 @@ jobs:
           export WAYLAND_DISPLAY=wayland-9
           for _ in {1..50}; do [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break; sleep 0.1; done
           scripts/check-qml-runtime.sh
-

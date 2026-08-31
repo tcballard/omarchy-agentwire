@@ -23,4 +23,3 @@ fi
 [[ $(git -C "$CORE" rev-parse HEAD) == "$AGENTWIRE_REVISION" ]] || { echo "AgentWire checkout is not pinned revision" >&2; exit 1; }
 [[ -z $(git -C "$CORE" status --porcelain) ]] || { echo "AgentWire checkout is dirty" >&2; exit 1; }
 node "$ROOT/scripts/check-agentwire-contract.cjs" "$CORE/contracts/inspector-summary-v1.example.json"
-
