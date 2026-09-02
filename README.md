@@ -29,11 +29,17 @@ command:
   record -- codex app-server
 ```
 
-The launcher automatically creates a private trace under
+The native runtime exclusively creates a randomly named private trace under
 `$XDG_STATE_HOME/agentwire/traces` (or `~/.local/state/agentwire/traces`) and
 publishes it to the already-running inspector. Supplying `--trace` still lets
 you choose a trace path. Starting a recording is an explicit user action;
 installing and operating the Omarchy integration is automatic.
+
+The loopback inspector API is protected by a per-hub 256-bit capability kept
+in an owner-only XDG runtime file. The panel reads it through the native
+launcher and the browser receives it in the URL fragment. Traces and inspector
+responses are bounded; the hub restart budget and explicit action deadlines
+prevent persistent crash loops or abandoned helper processes.
 
 ## Remove
 

@@ -10,15 +10,19 @@ esac
 
 RUNTIME_ROOT=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}/agentwire
 STATE_ROOT=${XDG_STATE_HOME:-${HOME:?HOME is required}/.local/state}/agentwire
-mkdir -p -- "$RUNTIME_ROOT" "$STATE_ROOT/traces"
-chmod 700 -- "$RUNTIME_ROOT" "$STATE_ROOT" "$STATE_ROOT/traces"
 SNAPSHOT="$RUNTIME_ROOT/inspector.json"
+AUTH_TOKEN="$RUNTIME_ROOT/inspector.token"
 
 command_name=${1:-}
 case $command_name in
   hub)
     shift
-    exec "$BINARY" hub --state "$SNAPSHOT" "$@"
+    exec "$BINARY" hub --state "$SNAPSHOT" --auth-token-file "$AUTH_TOKEN" "$@"
+    ;;
+  auth-token)
+    shift
+    [[ $# == 0 ]] || { echo "auth-token does not accept arguments" >&2; exit 64; }
+    exec "$BINARY" auth-token --file "$AUTH_TOKEN"
     ;;
   record)
     shift
@@ -26,7 +30,7 @@ case $command_name in
     for argument in "$@"; do
       [[ $argument == -- ]] && break
       [[ $argument == --trace || $argument == --trace=* ]] && has_trace=true
-      if [[ $argument == --ui || $argument == --publish-summary || $argument == --publish-summary=* ]]; then
+      if [[ $argument == --trace-dir || $argument == --trace-dir=* || $argument == --ui || $argument == --publish-summary || $argument == --publish-summary=* ]]; then
         echo "The Omarchy plugin owns AgentWire's inspector hub; $argument is not available through its launcher" >&2
         exit 64
       fi
@@ -34,10 +38,20 @@ case $command_name in
 
     record_arguments=(--publish-summary "$SNAPSHOT")
     if [[ $has_trace == false ]]; then
-      trace="$STATE_ROOT/traces/agentwire-$(date -u +%Y%m%dT%H%M%SZ)-$$.jsonl"
-      record_arguments+=(--trace "$trace")
+      record_arguments+=(--trace-dir "$STATE_ROOT/traces")
     fi
     exec "$BINARY" record "${record_arguments[@]}" "$@"
+    ;;
+  copy)
+    shift
+    [[ $# == 1 ]] || { echo "copy requires exactly one value" >&2; exit 64; }
+    exec setsid timeout --signal=TERM --kill-after=1s 5s \
+      bash -c 'printf %s "$1" | wl-copy' agentwire-copy "$1"
+    ;;
+  open-traces)
+    shift
+    [[ $# == 0 ]] || { echo "open-traces does not accept arguments" >&2; exit 64; }
+    exec setsid timeout --signal=TERM --kill-after=1s 5s xdg-open "$STATE_ROOT/traces"
     ;;
   *)
     exec "$BINARY" "$@"

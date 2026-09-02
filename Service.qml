@@ -8,7 +8,10 @@ Item {
 
   property var manifest: null
   property bool hubWanted: false
+  property bool destroying: false
+  property int restartCount: 0
   property string lastError: ""
+  readonly property int maxRestarts: 5
 
   readonly property string sourceDir: manifest && manifest.__sourceDir
     ? String(manifest.__sourceDir) : ""
@@ -18,7 +21,7 @@ Item {
   readonly property bool ready: launcherPath !== "" && snapshotPath !== ""
 
   function startHub() {
-    if (!ready || hubProcess.running) return
+    if (!ready || destroying || hubProcess.running || restartCount >= maxRestarts) return
     lastError = ""
     hubProcess.command = [launcherPath, "hub", "--listen", "127.0.0.1:4777"]
     hubWanted = true
@@ -26,15 +29,34 @@ Item {
 
   onReadyChanged: {
     if (ready) startHub()
-    else hubWanted = false
+    else {
+      restartTimer.stop()
+      stabilityTimer.stop()
+      hubWanted = false
+      restartCount = 0
+    }
   }
   Component.onCompleted: startHub()
+  Component.onDestruction: {
+    destroying = true
+    restartTimer.stop()
+    stabilityTimer.stop()
+    hubWanted = false
+    hubProcess.running = false
+  }
 
   Timer {
     id: restartTimer
-    interval: 2000
+    interval: 1000
     repeat: false
     onTriggered: root.startHub()
+  }
+
+  Timer {
+    id: stabilityTimer
+    interval: 60000
+    repeat: false
+    onTriggered: root.restartCount = 0
   }
 
   Process {
@@ -51,10 +73,19 @@ Item {
     }
     onExited: function(exitCode) {
       root.hubWanted = false
-      if (root.ready) {
+      stabilityTimer.stop()
+      if (root.ready && !root.destroying && root.restartCount < root.maxRestarts) {
         if (exitCode !== 0 && root.lastError === "") root.lastError = "AgentWire hub stopped"
+        root.restartCount++
+        restartTimer.interval = Math.min(30000, 1000 * Math.pow(2, root.restartCount - 1))
         restartTimer.restart()
+      } else if (root.ready && !root.destroying) {
+        root.lastError = "AgentWire hub restart limit reached"
       }
+    }
+    onRunningChanged: {
+      if (running) stabilityTimer.restart()
+      else stabilityTimer.stop()
     }
   }
 }
