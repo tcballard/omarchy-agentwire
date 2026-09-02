@@ -18,6 +18,12 @@
   incompatible, misconfigured, offline, and connecting states.
 - Add fixed loopback routing, final-response and media-type checks,
   single-flight polling, timeout, response limit, and bounded backoff.
+- Authenticate inspector APIs with a per-hub owner-only capability and reject
+  cross-origin or cross-site API requests.
+- Use exclusive random trace creation, descriptor-anchored no-follow file
+  operations, atomic state publication, and bounded trace/event retention.
+- Bound service restarts and explicit action runtimes, including forced helper
+  termination and unload cleanup.
 - Add pinned cross-repository contract tests, byte-for-byte bundled-runtime
   provenance, official Omarchy validation, Quickshell runtime CI,
   deterministic release assets, and release runbooks.

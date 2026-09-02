@@ -38,7 +38,8 @@ test("bundled runtime matches its committed checksum", () => {
   const binary = fs.readFileSync(path.join(root, "bin/agentwire-x86_64"))
   const expected = read("bin/agentwire-x86_64.sha256").trim().split(/\s+/)[0]
   assert.equal(crypto.createHash("sha256").update(binary).digest("hex"), expected)
-  assert.match(childProcess.execFileSync(path.join(root, "bin/agentwire-x86_64"), ["--version"], { encoding: "utf8" }), /^agentwire 0\.1\.0\s*$/)
+  if (process.platform === "linux" && process.arch === "x64")
+    assert.match(childProcess.execFileSync(path.join(root, "bin/agentwire-x86_64"), ["--version"], { encoding: "utf8" }), /^agentwire 0\.1\.0\s*$/)
 })
 
 test("native launcher supplies private state without changing wrapped commands", () => {
@@ -53,19 +54,28 @@ test("native launcher supplies private state without changing wrapped commands",
     fs.chmodSync(path.join(bin, "agentwire"), 0o755)
     fs.writeFileSync(path.join(bin, "agentwire-x86_64"), "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >\"$CAPTURE\"\n")
     fs.chmodSync(path.join(bin, "agentwire-x86_64"), 0o755)
+    fs.writeFileSync(path.join(bin, "uname"), "#!/usr/bin/env bash\nprintf '%s\\n' x86_64\n")
+    fs.chmodSync(path.join(bin, "uname"), 0o755)
     fs.mkdirSync(runtime)
-    const env = { ...process.env, CAPTURE: capture, HOME: fixture, XDG_RUNTIME_DIR: runtime, XDG_STATE_HOME: state }
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, CAPTURE: capture, HOME: fixture, XDG_RUNTIME_DIR: runtime, XDG_STATE_HOME: state }
 
     childProcess.execFileSync(path.join(bin, "agentwire"), ["hub", "--listen", "127.0.0.1:4777"], { env })
     assert.deepEqual(fs.readFileSync(capture, "utf8").trim().split("\n"), [
-      "hub", "--state", path.join(runtime, "agentwire/inspector.json"), "--listen", "127.0.0.1:4777"
+      "hub", "--state", path.join(runtime, "agentwire/inspector.json"),
+      "--auth-token-file", path.join(runtime, "agentwire/inspector.token"),
+      "--listen", "127.0.0.1:4777"
+    ])
+
+    childProcess.execFileSync(path.join(bin, "agentwire"), ["auth-token"], { env })
+    assert.deepEqual(fs.readFileSync(capture, "utf8").trim().split("\n"), [
+      "auth-token", "--file", path.join(runtime, "agentwire/inspector.token")
     ])
 
     childProcess.execFileSync(path.join(bin, "agentwire"), ["record", "--protocol", "acp", "--", "/bin/true", "--trace"], { env })
     const generated = fs.readFileSync(capture, "utf8").trim().split("\n")
     assert.deepEqual(generated.slice(0, 3), ["record", "--publish-summary", path.join(runtime, "agentwire/inspector.json")])
-    assert.equal(generated[3], "--trace")
-    assert.match(generated[4], new RegExp(`^${state.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/agentwire/traces/agentwire-`))
+    assert.equal(generated[3], "--trace-dir")
+    assert.equal(generated[4], path.join(state, "agentwire/traces"))
     assert.deepEqual(generated.slice(5), ["--protocol", "acp", "--", "/bin/true", "--trace"])
 
     const explicit = path.join(fixture, "chosen.jsonl")
@@ -91,12 +101,35 @@ test("poller carries the response and lifecycle guards", () => {
     assert.ok(read("Model.js").includes(`\"${state}\"`) || panel.includes(`\"${state}\"`))
 })
 
+test("inspector APIs use an owner-only capability without query leakage", () => {
+  const launcher = read("bin/agentwire")
+  const panel = read("Panel.qml")
+  assert.match(launcher, /--auth-token-file/)
+  assert.match(launcher, /auth-token --file/)
+  assert.match(panel, /setRequestHeader\("Authorization", "Bearer " \+ root\.authToken\)/)
+  assert.match(panel, /\/#token=/)
+  assert.doesNotMatch(panel, /\?token=/)
+})
+
+test("service and actions have restart, deadline, and teardown bounds", () => {
+  const launcher = read("bin/agentwire")
+  const service = read("Service.qml")
+  const panel = read("Panel.qml")
+  assert.match(service, /maxRestarts: 5/)
+  assert.match(service, /Math\.min\(30000, 1000 \* Math\.pow/)
+  assert.match(service, /Component\.onDestruction/)
+  assert.match(launcher, /setsid timeout --signal=TERM --kill-after=1s 5s/)
+  for (const marker of ["tokenDeadline", "copyDeadline", "traceDeadline", "Component.onDestruction"])
+    assert.ok(panel.includes(marker))
+})
+
 test("panel copies explicit recording recipes without launching them", () => {
   const panel = read("Panel.qml")
   assert.match(panel, /barWidgetRegistry\.metadataFor\(root\.moduleName\)/)
   assert.match(panel, /sourceDir \+ "\/bin\/agentwire"/)
   assert.match(panel, /" record -- " \+ recipe\.target/)
-  assert.match(panel, /wl-copy/)
+  assert.match(panel, /copyProcess\.command = \[root\.launcherPath, "copy", command\]/)
+  assert.match(read("bin/agentwire"), /wl-copy/)
   for (const recipe of ["codex", "acp", "mcp"])
     assert.match(panel, new RegExp(`copyRecordCommand\\("${recipe}"\\)`))
   assert.doesNotMatch(panel, /execDetached\(\[root\.launcherPath,\s*"record"/)
@@ -106,7 +139,7 @@ test("panel opens the private XDG trace folder explicitly", () => {
   const panel = read("Panel.qml")
   assert.match(panel, /XDG_STATE_HOME/)
   assert.match(panel, /\.local\/state\/agentwire\/traces/)
-  assert.match(panel, /traceProcess\.command = \["xdg-open", root\.tracesDir\]/)
+  assert.match(panel, /traceProcess\.command = \[root\.launcherPath, "open-traces"\]/)
   assert.match(panel, /text === "t" \|\| text === "T"/)
 })
 

@@ -17,6 +17,8 @@ Panel {
   property int failures: 0
   property int requestSerial: 0
   property var activeRequest: null
+  property string authToken: ""
+  property string pendingAuthToken: ""
   property string pendingRecipe: ""
   property string copiedRecipe: ""
   property string failedRecipe: ""
@@ -61,6 +63,12 @@ Panel {
       root.schedule()
       return
     }
+    if (root.authToken === "") {
+      root.connectionState = "connecting"
+      root.loadAuthToken(false)
+      root.schedule()
+      return
+    }
     if (root.activeRequest && root.activeRequest.readyState !== XMLHttpRequest.DONE) {
       if (!force) return
       root.requestSerial++
@@ -94,6 +102,12 @@ Panel {
         root.fail("unavailable")
         return
       }
+      if (request.status === 401) {
+        root.authToken = ""
+        root.fail("connecting")
+        root.loadAuthToken(true)
+        return
+      }
       if (request.status !== 200) { root.fail("unavailable"); return }
       var parsed
       try { parsed = Model.parseSummary(JSON.parse(body)) }
@@ -105,12 +119,22 @@ Panel {
       root.schedule()
     }
     request.open("GET", Model.summaryUrl(root.inspectorUrl))
+    request.setRequestHeader("Authorization", "Bearer " + root.authToken)
     request.send()
     requestTimeout.restart()
   }
 
   function openInspector() {
-    if (root.inspectorUrl !== "") Qt.openUrlExternally(root.inspectorUrl)
+    if (root.inspectorUrl !== "" && root.authToken !== "")
+      Qt.openUrlExternally(root.inspectorUrl + "/#token=" + encodeURIComponent(root.authToken))
+  }
+
+  function loadAuthToken(force) {
+    if (root.launcherPath === "" || tokenProcess.running || (!force && root.authToken !== "")) return
+    root.pendingAuthToken = ""
+    tokenProcess.command = [root.launcherPath, "auth-token"]
+    tokenProcess.running = true
+    tokenDeadline.restart()
   }
 
   function recordCommand(recipeKey) {
@@ -130,25 +154,92 @@ Panel {
     root.pendingRecipe = recipeKey
     root.copiedRecipe = ""
     root.failedRecipe = ""
-    copyProcess.command = ["bash", "-c", "printf %s " + Util.shellQuote(command) + " | wl-copy"]
+    copyProcess.command = [root.launcherPath, "copy", command]
     copyProcess.running = true
+    copyDeadline.restart()
   }
 
   function openTraceFolder() {
     if (root.tracesDir === "" || traceProcess.running) return
     root.traceOpenState = "opening"
-    traceProcess.command = ["xdg-open", root.tracesDir]
+    traceProcess.command = [root.launcherPath, "open-traces"]
     traceProcess.running = true
+    traceDeadline.restart()
   }
 
   onOpenedChanged: if (opened) refresh(true)
-  Component.onCompleted: refresh(false)
+  Component.onCompleted: root.loadAuthToken(false)
+  Component.onDestruction: {
+    pollTimer.stop()
+    requestTimeout.stop()
+    tokenDeadline.stop()
+    copyDeadline.stop()
+    traceDeadline.stop()
+    if (root.activeRequest) root.activeRequest.abort()
+    root.activeRequest = null
+    tokenProcess.running = false
+    copyProcess.running = false
+    traceProcess.running = false
+  }
 
   Timer {
     id: pollTimer
     interval: root.pollIntervalMs
     repeat: false
     onTriggered: root.refresh(false)
+  }
+
+  Timer {
+    id: tokenDeadline
+    interval: 3000
+    repeat: false
+    onTriggered: {
+      tokenProcess.running = false
+      root.fail("offline")
+    }
+  }
+
+  Timer {
+    id: copyDeadline
+    interval: 6000
+    repeat: false
+    onTriggered: {
+      copyProcess.running = false
+      root.failedRecipe = root.pendingRecipe
+      root.pendingRecipe = ""
+      actionFeedbackTimer.restart()
+    }
+  }
+
+  Timer {
+    id: traceDeadline
+    interval: 6000
+    repeat: false
+    onTriggered: {
+      traceProcess.running = false
+      root.traceOpenState = "failed"
+      actionFeedbackTimer.restart()
+    }
+  }
+
+  Process {
+    id: tokenProcess
+    running: false
+    command: []
+    stdout: SplitParser {
+      onRead: function(data) {
+        var candidate = String(data || "").trim()
+        if (candidate.length <= 128) root.pendingAuthToken = candidate
+      }
+    }
+    onExited: function(exitCode) {
+      tokenDeadline.stop()
+      var valid = exitCode === 0 && /^[0-9a-f]{64}$/.test(root.pendingAuthToken)
+      root.authToken = valid ? root.pendingAuthToken : ""
+      root.pendingAuthToken = ""
+      if (valid) root.refresh(true)
+      else root.fail("offline")
+    }
   }
 
   Timer {
@@ -180,6 +271,7 @@ Panel {
     running: false
     command: []
     onExited: function(exitCode) {
+      copyDeadline.stop()
       root.copiedRecipe = exitCode === 0 ? root.pendingRecipe : ""
       root.failedRecipe = exitCode === 0 ? "" : root.pendingRecipe
       root.pendingRecipe = ""
@@ -192,6 +284,7 @@ Panel {
     running: false
     command: []
     onExited: function(exitCode) {
+      traceDeadline.stop()
       root.traceOpenState = exitCode === 0 ? "opened" : "failed"
       actionFeedbackTimer.restart()
     }
