@@ -52,26 +52,33 @@ test("native launcher supplies private state without changing wrapped commands",
     fs.mkdirSync(bin)
     fs.copyFileSync(path.join(root, "bin/agentwire"), path.join(bin, "agentwire"))
     fs.chmodSync(path.join(bin, "agentwire"), 0o755)
-    fs.writeFileSync(path.join(bin, "agentwire-x86_64"), "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >\"$CAPTURE\"\n")
+    fs.writeFileSync(path.join(bin, "agentwire-x86_64"), "#!/bin/bash\nprintf '%s\\n' \"$@\" >\"$CAPTURE\"\n")
     fs.chmodSync(path.join(bin, "agentwire-x86_64"), 0o755)
-    fs.writeFileSync(path.join(bin, "uname"), "#!/usr/bin/env bash\nprintf '%s\\n' x86_64\n")
-    fs.chmodSync(path.join(bin, "uname"), 0o755)
+    const poison = path.join(fixture, "path-command-ran")
+    const hostilePath = path.join(fixture, "hostile-path")
+    fs.mkdirSync(hostilePath)
+    for (const command of ["dirname", "uname", "setsid", "timeout", "bash", "wl-copy", "xdg-open"]) {
+      fs.writeFileSync(path.join(hostilePath, command), `#!/usr/bin/bash\nprintf '%s\\n' '${command}' >\"$POISON\"\nexit 99\n`)
+      fs.chmodSync(path.join(hostilePath, command), 0o755)
+    }
     fs.mkdirSync(runtime)
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, CAPTURE: capture, HOME: fixture, XDG_RUNTIME_DIR: runtime, XDG_STATE_HOME: state }
+    const env = { ...process.env, PATH: hostilePath, POISON: poison, CAPTURE: capture, HOME: fixture, XDG_RUNTIME_DIR: runtime, XDG_STATE_HOME: state }
+    const launcher = path.join(bin, "agentwire")
+    const runLauncher = arguments => childProcess.execFileSync("/bin/bash", [launcher, ...arguments], { env })
 
-    childProcess.execFileSync(path.join(bin, "agentwire"), ["hub", "--listen", "127.0.0.1:4777"], { env })
+    runLauncher(["hub", "--listen", "127.0.0.1:4777"])
     assert.deepEqual(fs.readFileSync(capture, "utf8").trim().split("\n"), [
       "hub", "--state", path.join(runtime, "agentwire/inspector.json"),
       "--auth-token-file", path.join(runtime, "agentwire/inspector.token"),
       "--listen", "127.0.0.1:4777"
     ])
 
-    childProcess.execFileSync(path.join(bin, "agentwire"), ["auth-token"], { env })
+    runLauncher(["auth-token"])
     assert.deepEqual(fs.readFileSync(capture, "utf8").trim().split("\n"), [
       "auth-token", "--file", path.join(runtime, "agentwire/inspector.token")
     ])
 
-    childProcess.execFileSync(path.join(bin, "agentwire"), ["record", "--protocol", "acp", "--", "/bin/true", "--trace"], { env })
+    runLauncher(["record", "--protocol", "acp", "--", "/bin/true", "--trace"])
     const generated = fs.readFileSync(capture, "utf8").trim().split("\n")
     assert.deepEqual(generated.slice(0, 3), ["record", "--publish-summary", path.join(runtime, "agentwire/inspector.json")])
     assert.equal(generated[3], "--trace-dir")
@@ -79,14 +86,23 @@ test("native launcher supplies private state without changing wrapped commands",
     assert.deepEqual(generated.slice(5), ["--protocol", "acp", "--", "/bin/true", "--trace"])
 
     const explicit = path.join(fixture, "chosen.jsonl")
-    childProcess.execFileSync(path.join(bin, "agentwire"), ["record", `--trace=${explicit}`, "--", "/bin/true"], { env })
+    runLauncher(["record", `--trace=${explicit}`, "--", "/bin/true"])
     const preserved = fs.readFileSync(capture, "utf8").trim().split("\n")
     assert.equal(preserved.filter(argument => argument === "--trace" || argument.startsWith("--trace=")).length, 1)
     assert.equal(preserved.includes(`--trace=${explicit}`), true)
 
-    const blocked = childProcess.spawnSync(path.join(bin, "agentwire"), ["record", "--ui", "--", "/bin/true"], { env, encoding: "utf8" })
+    const blocked = childProcess.spawnSync("/bin/bash", [launcher, "record", "--ui", "--", "/bin/true"], { env, encoding: "utf8" })
     assert.equal(blocked.status, 64)
     assert.match(blocked.stderr, /plugin owns AgentWire's inspector hub/)
+
+    runLauncher(["copy", "copy me"])
+    assert.deepEqual(fs.readFileSync(capture, "utf8").trim().split("\n"), ["system-action", "copy", "copy me"])
+
+    runLauncher(["open-traces"])
+    assert.deepEqual(fs.readFileSync(capture, "utf8").trim().split("\n"), [
+      "system-action", "open", path.join(state, "agentwire/traces")
+    ])
+    assert.equal(fs.existsSync(poison), false)
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })
   }
@@ -118,7 +134,9 @@ test("service and actions have restart, deadline, and teardown bounds", () => {
   assert.match(service, /maxRestarts: 5/)
   assert.match(service, /Math\.min\(30000, 1000 \* Math\.pow/)
   assert.match(service, /Component\.onDestruction/)
-  assert.match(launcher, /setsid timeout --signal=TERM --kill-after=1s 5s/)
+  assert.match(launcher, /system-action copy/)
+  assert.match(launcher, /system-action open/)
+  assert.doesNotMatch(launcher, /exec (setsid|timeout|bash|wl-copy|xdg-open)/)
   for (const marker of ["tokenDeadline", "copyDeadline", "traceDeadline", "Component.onDestruction"])
     assert.ok(panel.includes(marker))
 })
@@ -129,7 +147,7 @@ test("panel copies explicit recording recipes without launching them", () => {
   assert.match(panel, /sourceDir \+ "\/bin\/agentwire"/)
   assert.match(panel, /" record -- " \+ recipe\.target/)
   assert.match(panel, /copyProcess\.command = \[root\.launcherPath, "copy", command\]/)
-  assert.match(read("bin/agentwire"), /wl-copy/)
+  assert.match(read("bin/agentwire"), /system-action copy/)
   for (const recipe of ["codex", "acp", "mcp"])
     assert.match(panel, new RegExp(`copyRecordCommand\\("${recipe}"\\)`))
   assert.doesNotMatch(panel, /execDetached\(\[root\.launcherPath,\s*"record"/)

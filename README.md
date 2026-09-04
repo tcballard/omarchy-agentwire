@@ -78,9 +78,12 @@ Saved traces open from `$XDG_STATE_HOME/agentwire/traces` or the fallback
 
 - Requires x86-64 Omarchy with a compatible Quattro shell. The bundled
   AgentWire executable does not currently support ARM systems.
-- Uses Omarchy's existing `bash`, `wl-copy`, and `xdg-open` commands for the
-  explicit copy-command and open-trace-folder actions. It does not add system
-  packages or change system configuration.
+- Uses Omarchy's existing `/usr/bin/bash`, `/usr/bin/wl-copy`, and
+  `/usr/bin/xdg-open` for the explicit copy-command and open-trace-folder
+  actions. The attested runtime opens each action helper without following
+  symlinks, verifies its root ownership and non-writable executable mode, and
+  executes that exact opened object with a sanitized `PATH`. It does not add
+  system packages or change system configuration.
 - Runs as unsandboxed user code. When enabled, it starts the bundled AgentWire
   child process, binds `127.0.0.1:4777`, and writes owner-only runtime state and
   traces below the user's XDG directories.
