@@ -31,7 +31,12 @@ no-follow operations, uses exclusive random trace names, and atomically
 publishes the snapshot and capability with owner-only permissions. It caps
 trace size, event size and count, snapshot size, and inspector event responses.
 The service has a bounded restart budget; clipboard and folder actions have
-deadlines, forced termination, and destruction cleanup.
+deadlines, forced termination, and destruction cleanup. The absolute launcher
+does not consult ambient `PATH` to locate itself, choose an architecture, or
+dispatch actions. The attested runtime opens each allowlisted `/usr/bin` action
+helper with no symlink following, validates its file type, root ownership,
+non-writable mode, and executable bits, and executes the descriptor-bound
+object with a sanitized `PATH` and shell/loader environment.
 CI rebuilds the bundled x86-64 executable from the exact public AgentWire
 revision and Rust toolchain in `scripts/contract-revisions.sh`, then requires a
 byte-for-byte match and verifies the committed SHA-256 digest.

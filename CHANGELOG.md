@@ -24,6 +24,8 @@
   operations, atomic state publication, and bounded trace/event retention.
 - Bound service restarts and explicit action runtimes, including forced helper
   termination and unload cleanup.
+- Remove ambient `PATH` from launcher and action trust decisions; validate and
+  execute allowlisted system helpers through descriptor-bound native actions.
 - Add pinned cross-repository contract tests, byte-for-byte bundled-runtime
   provenance, official Omarchy validation, Quickshell runtime CI,
   deterministic release assets, and release runbooks.

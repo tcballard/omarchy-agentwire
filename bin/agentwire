@@ -1,11 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 set -euo pipefail
 
-ROOT=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-case $(uname -m) in
-  x86_64) BINARY="$ROOT/bin/agentwire-x86_64" ;;
-  *) echo "AgentWire does not support this Omarchy architecture yet" >&2; exit 69 ;;
-esac
+SOURCE=${BASH_SOURCE[0]}
+[[ $SOURCE == /* && $SOURCE == */* ]] || { echo "AgentWire launcher requires an absolute path" >&2; exit 69; }
+SCRIPT_DIR=${SOURCE%/*}
+BINARY="$SCRIPT_DIR/agentwire-x86_64"
 [[ -x $BINARY ]] || { echo "AgentWire runtime is missing from this plugin" >&2; exit 69; }
 
 RUNTIME_ROOT=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}/agentwire
@@ -45,13 +44,12 @@ case $command_name in
   copy)
     shift
     [[ $# == 1 ]] || { echo "copy requires exactly one value" >&2; exit 64; }
-    exec setsid timeout --signal=TERM --kill-after=1s 5s \
-      bash -c 'printf %s "$1" | wl-copy' agentwire-copy "$1"
+    exec "$BINARY" system-action copy "$1"
     ;;
   open-traces)
     shift
     [[ $# == 0 ]] || { echo "open-traces does not accept arguments" >&2; exit 64; }
-    exec setsid timeout --signal=TERM --kill-after=1s 5s xdg-open "$STATE_ROOT/traces"
+    exec "$BINARY" system-action open "$STATE_ROOT/traces"
     ;;
   *)
     exec "$BINARY" "$@"
